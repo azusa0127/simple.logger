@@ -140,10 +140,10 @@ class Logger {
     if (LEVELS_MAPPING[validateChannelInput(channel)] <= this.logLevel) this._console.groupEnd()
   }
   enterBlock(label, channel = `info`) {
-    return this._write(`[${label}] Begin...`, { channel, indentAfter: 2 })
+    return this._write({ channel, indentAfter: 2 }, `[${label}] Begin...`)
   }
   exitBlock(label, channel = `info`) {
-    return this._write(`[${label}] Completed!`, { channel, indentAfter: -2 })
+    return this._write({ channel, indentAfter: -2 }, `[${label}] Completed!`)
   }
   setLogLevel(level = 'info') {
     const prevLevel = this.logLevel
