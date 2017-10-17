@@ -11,85 +11,93 @@
  */
 const path = require('path')
 const { createWriteStream } = require('fs')
-const { format, inspect } = require('util')
+const { inspect } = require('util')
 /**
  * ============================================================================
  * Library.
  * ============================================================================
  */
+const LEVELS_MAPPING = {
+  error: 0,
+  warn: 1,
+  info: 2,
+  log: 3,
+  debug: 4,
+  trace: 5,
+}
+
+function validateChannelInput(channel) {
+  switch (channel) {
+    case 'error':
+    case 'warn':
+    case 'info':
+    case 'log':
+    case 'debug':
+    case 'trace':
+      return channel
+    default:
+      throw new TypeError(`Invalid log channel/level ${channel}`)
+  }
+}
+
+const formatTimeStamp = (showTime = true) => (showTime ? `${new Date().toLocaleString()}|` : '')
+
+const formatChannel = (channel, showChannel = true) =>
+  showChannel ? `${channel.toUpperCase()}${' '.repeat(5 - channel.length)}|` : ''
+
+const formatPrefixes = (globalPrefix, localLabel) =>
+  globalPrefix && localLabel
+    ? `${globalPrefix} <${localLabel}>`
+    : globalPrefix ? `${globalPrefix}|` : localLabel ? `<${localLabel}>` : ''
+
+const formatData = (channel = 'info', data) =>
+  LEVELS_MAPPING[channel] === 4 && typeof data !== 'string'
+    ? `\n${inspect(data, false, 10, true)}`
+    : data
+
+/**
+ * ============================================================================
+ * Logger.
+ * ============================================================================
+ */
 class Logger {
-  /**
-   * Creates an instance of Logger.
-   * @param {(Object|string)} [options={}] Logger options or prefix value
-   * @param {string} [options.level='info'] Log Level. Determines the verboseness of the logger.
-   * @param {string} [options.prefix=''] Prefix label. The Label showed infront of every message.
-   * @param {number} [options.indent=0] Initial indentation. The initial number of spaces to indent.
-   * @param {Object} [options.outStream=[stdout, stderr]]
-   * @memberof Logger
-   */
   constructor(opt = {}) {
-    let { level = 'info', prefix = '', indent = 0, outStream } = opt
+    let {
+      level = 'info',
+      prefix = '',
+      outStream = [process.stdout, process.stderr],
+      showTime = true,
+      showChannel = true,
+    } = opt
     if (typeof opt === 'string') prefix = opt
-    this.LEVELS = ['error', 'warn', 'info', 'log', 'debug', 'trace']
-    this.logLevel = this._validateChannelInput(level)
+    this.logLevel = LEVELS_MAPPING[validateChannelInput(level)]
     this.logPrefix = typeof prefix === 'string' ? prefix : ''
-    this.logIndent = typeof indent === 'number' ? indent : 0
-    this._console = outStream
-      ? Array.isArray(outStream)
-        ? new console.Console(...outStream)
-        : new console.Console(outStream, outStream)
-      : console
+    this._console = Array.isArray(outStream)
+      ? new console.Console(outStream[0], outStream[1])
+      : new console.Console(outStream, outStream)
+    this.showTime = showTime
+    this.showChannel = showChannel
+
+    this.indent = 0
   }
-  /**
-   * Internal channel input validator.
-   *
-   * @param {any} channel a channel/level input.
-   * @returns {string} a valid channel string.
-   * @memberof Logger
-   */
-  _validateChannelInput(channel) {
-    if (typeof channel !== 'string') throw new Error('log channel/level must be a string!')
-    if (!this.LEVELS.includes(channel)) throw new Error(`Invalid log channel/level ${channel}!`)
-    return channel
-  }
-  /**
-   * Internal write function, controls output template and output level control.
-   *
-   * @param {any} data Data to be written.
-   * @param {string} [channel='info'] Log Channel.
-   * @param {(string|Buffer)} [prefix=''] Sub-Prefix label.
-   * @param {bool} [rawFormat=false] If output in the raw format.
-   * @return {bool} If message emitted or not.
-   * @memberof Logger
-   */
-  _write(data, { channel = 'info', prefix = '', rawFormat = false, indentAfter = 0 }) {
-    if (
-      this.LEVELS.indexOf(this._validateChannelInput(channel)) > this.LEVELS.indexOf(this.logLevel)
-    )
-      return false
-    const timeStamp = `${new Date().toLocaleString()}|`
-    // Format prefixes.
-    const prefixes = rawFormat
-      ? ''
-      : format(
-          '%s%s%s%s%s%s',
-          timeStamp,
-          ' '.repeat(5 - channel.length),
-          channel.toUpperCase(),
-          this.logPrefix.length ? `|${this.logPrefix}|` : '|',
-          ' '.repeat(this.logIndent),
-          prefix.length ? ` <${prefix}> ` : '',
-        )
-    // Re-format object string.
-    if (typeof data !== 'string') data = inspect(data, false, 10, true)
-    const message =
-      data.indexOf('\n') !== data.lastIndexOf('\n') && !rawFormat
-        ? `${prefixes}\n${data}`
-        : format(prefixes, data)
+  _write(
+    { channel = 'info', label = '', showTime = true, showChannel = true, indentAfter = 0 },
+    data,
+  ) {
+    if (LEVELS_MAPPING[validateChannelInput(channel)] > this.logLevel) return false
+
+    const message = `${[
+      formatTimeStamp(showTime),
+      formatChannel(channel, showChannel),
+      formatPrefixes(this.logPrefix, label),
+      ' '.repeat(this.indent),
+    ]
+      .filter(x => x)
+      .join('')} ${formatData(channel, data)}`
+
     switch (channel) {
       case 'trace':
-        this._console.log(prefixes)
-        this._console.trace(data)
+        this._console.trace(message)
         break
       case 'error':
       case 'warn':
@@ -107,129 +115,44 @@ class Logger {
     this.logIndent += indentAfter
     return true
   }
-  /**
-   * Log data on 'error' channel with Console.error().
-   *
-   * @param {any} data Data to be written.
-   * @param {string|Buffer} [prefix=''] Prefix label.
-   * @return {boolean} If message emitted or not.
-   * @memberof Logger
-   */
-  error(data, prefix = '') {
-    return this._write(data, { channel: 'error', prefix })
+  error(data, label = '') {
+    return this._write({ channel: 'error', label }, data)
   }
-  /**
-   * Log data on 'warn' channel with Console.error().
-   *
-   * @param {any} data Data to be written.
-   * @param {string|Buffer} [prefix=''] Prefix label.
-   * @return {boolean} If message emitted or not.
-   * @memberof Logger
-   */
-  warn(data, prefix = '') {
-    return this._write(data, { channel: 'warn', prefix })
+  warn(data, label = '') {
+    return this._write({ channel: 'warn', label }, data)
   }
-  /**
-   * Log data on 'info' channel with Console.log().
-   *
-   * @param {any} data Data to be written.
-   * @param {string|Buffer} [prefix=''] Prefix label.
-   * @return {boolean} If message emitted or not.
-   * @memberof Logger
-   */
-  info(data, prefix = '') {
-    return this._write(data, { channel: 'info', prefix })
+  info(data, label = '') {
+    return this._write({ channel: 'info', label }, data)
   }
-  /**
-   * Log data on 'log' channel with Console.log().
-   *
-   * @param {any} data Data to be written.
-   * @param {string|Buffer} [prefix=''] Prefix label.
-   * @return {boolean} If message emitted or not.
-   * @memberof Logger
-   */
-  log(data, prefix = '') {
-    return this._write(data, { channel: 'log', prefix })
+  log(data, label = '') {
+    return this._write({ channel: 'log', label }, data)
   }
-  /**
-   * Log data on 'debug' channel with Console.log().
-   *
-   * @param {any} data Data to be written.
-   * @param {string|Buffer} [prefix=''] Prefix label.
-   * @return {boolean} If message emitted or not.
-   * @memberof Logger
-   */
-  debug(data, prefix = '') {
-    return this._write(data, { channel: 'debug', prefix })
+  debug(data, label = '') {
+    return this._write({ channel: 'debug', label }, data)
   }
-  /**
-   * Log data on 'trace' channel with Console.trace().
-   *
-   * @param {any} data Data to be written.
-   * @param {string|Buffer} [prefix=''] Prefix label.
-   * @return {boolean} If message emitted or not.
-   * @memberof Logger
-   */
-  trace(data, prefix = '') {
-    return this._write(data, { channel: 'trace', prefix })
+  trace(data, label = '') {
+    return this._write({ channel: 'trace', label }, data)
   }
-  /**
-   * Output data without formating.
-   *
-   * @param {any} data Data to be written.
-   * @param {string} [channel='info'] Output Channel.
-   * @return {boolean} If message emitted or not.
-   * @memberof Logger
-   */
-  raw(data, channel = 'info') {
-    return this._write(data, { channel, rawFormat: true })
+  group(label = '', channel = 'info') {
+    if (LEVELS_MAPPING[validateChannelInput(channel)] <= this.logLevel) this._console.group(label)
   }
-  /**
-   * Group the logger calls by block and indent following logs.
-   *
-   * @param {string|Buffer} label Group label.
-   * @param {string} [channel='info'] Log Channel.
-   * @return {boolean} If message emitted or not.
-   * @memberof Logger
-   */
-  enterBlock(label, channel = 'info') {
+  groupEnd(channel = 'info') {
+    if (LEVELS_MAPPING[validateChannelInput(channel)] <= this.logLevel) this._console.groupEnd()
+  }
+  enterBlock(label, channel = `info`) {
     return this._write(`[${label}] Begin...`, { channel, indentAfter: 2 })
   }
-  /**
-   * Ending the logger call block and unindent logs after.
-   *
-   * @param {string|Buffer} label Group label.
-   * @param {string} [channel='info'] Log Channel.
-   * @return {boolean} If message emitted or not.
-   * @memberof Logger
-   */
-  exitBlock(label, channel = 'info') {
+  exitBlock(label, channel = `info`) {
     return this._write(`[${label}] Completed!`, { channel, indentAfter: -2 })
   }
-  /**
-   * Change the Instance Log Level.
-   *
-   * @param {string} [level='info']
-   * @return {string} Previous Log Level pre-reassignment.
-   * @memberof Logger
-   */
   setLogLevel(level = 'info') {
     const prevLevel = this.logLevel
-    this.logLevel = this._validateChannelInput(level)
+    this.logLevel = validateChannelInput(level)
     return prevLevel
   }
 }
 
 class FileLogger extends Logger {
-  /**
-   * FileLogger Constructor
-   *
-   * @param {string|string[]} filename The name of the log files, can be either a single file for both stdout and stderr or a pair of files as [stdout, stderr].
-   *
-   * @param {string} [Options.level='info'] Log Level. Determines the verboseness of the logger.
-   * @param {string} [Options.prefix=''] Prefix label. The Label showed infront of every message.
-   * @param {number} [Options.indent=0] Initial indentation. The initial number of spaces to indent.
-   */
   constructor(filename, { level, prefix, indent } = {}) {
     const outStream = Array.isArray(filename)
       ? filename.map(x => path.resolve(x)).map(x => createWriteStream(x))

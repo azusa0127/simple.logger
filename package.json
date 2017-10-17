@@ -1,6 +1,6 @@
 {
   "name": "simple.logger",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "A Simple Logger",
   "main": "index.js",
   "scripts": {
