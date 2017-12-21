@@ -9,13 +9,13 @@ log.trace(Error(`This Will neither be traced.`));
 log.log(`Nor this one -- as the default log level is 'info'!`);
 
 log.enterBlock(`Story`);
-log.info(`Long long ago.`, `BackGround`);
+log.info(`Long long ago.`);
 log.enterBlock(`Warnings`, `warn`);
 log.warn(`1.This story will be boring.`);
 log.warn(`2.It's only single sentence.`);
 log.exitBlock(`Warnings`, `warn`);
 log.info(`The quick brown fox jumps over the lazy dog.`);
-log.error(`That's it.`, `END OF STORY`);
+log.error(`That's it.`);
 log.exitBlock(`Story`);
 
 // Change log level to show every channel.
@@ -43,6 +43,7 @@ const s = {
     },
   },
 };
-log.debug(s, `s`);
+log.debug(s);
+
 log.error(new Error(`A Minor Error?`));
 log.trace(new Error(`A Big Error!`));

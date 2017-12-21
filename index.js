@@ -9,14 +9,17 @@
  * Requires.
  * ============================================================================
  */
-const path = require('path')
-const { createWriteStream } = require('fs')
-const { inspect } = require('util')
+const path = require('path');
+const { createWriteStream } = require('fs');
+const { inspect } = require('util');
+
 /**
  * ============================================================================
  * Library.
  * ============================================================================
  */
+const EOL = process.platform === 'win' ? '\r\n' : '\n';
+
 const LEVELS_MAPPING = {
   error: 0,
   warn: 1,
@@ -24,7 +27,16 @@ const LEVELS_MAPPING = {
   log: 3,
   debug: 4,
   trace: 5,
-}
+};
+
+const LEVELS_SYMBOL = {
+  error: 'ERR',
+  warn: 'WRN',
+  info: 'IFO',
+  log: 'LOG',
+  debug: 'DBG',
+  trace: 'TCE',
+};
 
 function validateChannelInput(channel) {
   switch (channel) {
@@ -34,26 +46,24 @@ function validateChannelInput(channel) {
     case 'log':
     case 'debug':
     case 'trace':
-      return channel
+      return channel;
     default:
-      throw new TypeError(`Invalid log channel/level ${channel}`)
+      throw new TypeError(`Invalid log channel/level ${channel}`);
   }
 }
 
-const formatTimeStamp = (showTime = true) => (showTime ? `${new Date().toLocaleString()}|` : '')
+const padLeft = (x, len, symbol = ' ') => symbol.repeat(len) + x;
+const padRight = (x, len, symbol = ' ') => x + symbol.repeat(len);
 
-const formatChannel = (channel, showChannel = true) =>
-  showChannel ? `${channel.toUpperCase()}${' '.repeat(5 - channel.length)}|` : ''
+const padEOLandIndent = (message, indent = 0) =>
+  /\r?\n/.test(message)
+    ? padRight(EOL, indent) + message.split(/\r?\n/).join(padRight(EOL, indent))
+    : padLeft(message, indent);
 
-const formatPrefixes = (globalPrefix, localLabel) =>
-  globalPrefix && localLabel
-    ? `${globalPrefix} <${localLabel}>`
-    : globalPrefix ? `${globalPrefix}|` : localLabel ? `<${localLabel}>` : ''
-
-const formatData = (channel = 'info', data) =>
-  LEVELS_MAPPING[channel] === 4 && typeof data !== 'string'
-    ? `\n${inspect(data, false, 10, true)}`
-    : data
+const formatData = (channel = 'info', ...data) =>
+  data
+    .map(x => (channel !== 'error' && typeof x !== 'string' ? inspect(x, false, 10, true) : x))
+    .join(' ');
 
 /**
  * ============================================================================
@@ -67,88 +77,101 @@ class Logger {
       prefix = '',
       outStream = [process.stdout, process.stderr],
       showTime = true,
+      shortTime = false,
       showChannel = true,
-    } = opt
-    if (typeof opt === 'string') prefix = opt
-    this.logLevel = LEVELS_MAPPING[validateChannelInput(level)]
-    this.logPrefix = typeof prefix === 'string' ? prefix : ''
+    } = opt;
+    if (typeof opt === 'string') prefix = opt;
+    this.logLevel = LEVELS_MAPPING[validateChannelInput(level)];
+    this.logPrefix = typeof prefix === 'string' ? prefix : '';
     this._console = Array.isArray(outStream)
       ? new console.Console(outStream[0], outStream[1])
-      : new console.Console(outStream, outStream)
-    this.showTime = showTime
-    this.showChannel = showChannel
-
-    this.indent = 0
+      : new console.Console(outStream, outStream);
+    this.showTime = showTime;
+    this.shortTime = shortTime;
+    this.showChannel = showChannel;
+    this.logIndent = 0;
   }
   _write(
-    { channel = 'info', label = '', showTime = true, showChannel = true, indentAfter = 0 },
-    data,
+    {
+      channel = 'info',
+      label = '',
+      indentAfter = 0,
+      showTime = this.showTime,
+      showChannel = this.showChannel,
+      shortTime = this.shortTime,
+    },
+    ...data
   ) {
-    if (LEVELS_MAPPING[validateChannelInput(channel)] > this.logLevel) return false
+    if (LEVELS_MAPPING[channel] > this.logLevel) return false;
+
+    // Change Indentation
+    if (indentAfter < 0) this.logIndent += indentAfter;
 
     const message = `${[
-      formatTimeStamp(showTime),
-      formatChannel(channel, showChannel),
-      formatPrefixes(this.logPrefix, label),
-      ' '.repeat(this.indent),
+      showChannel ? LEVELS_SYMBOL[channel] : '',
+      showTime ? (shortTime ? new Date().toLocaleTimeString() : new Date().toLocaleString()) : '',
+      this.logPrefix,
     ]
       .filter(x => x)
-      .join('')} ${formatData(channel, data)}`
+      .join(' ')}| ${padEOLandIndent(
+      (label ? `<${label}> ` : label) + formatData(channel, ...data),
+      this.logIndent,
+    )}`;
 
     switch (channel) {
       case 'trace':
-        this._console.trace(message)
-        break
+        this._console.trace(message);
+        break;
       case 'error':
       case 'warn':
-        this._console.error(message)
-        break
+        this._console.error(message);
+        break;
       case 'info':
       case 'log':
       case 'debug':
-        this._console.log(message)
-        break
+        this._console.log(message);
+        break;
       default:
-        throw new Error(`Invalid Channel ${channel}!`)
+        throw new Error(`Invalid Channel ${channel}!`);
     }
     // Change Indentation
-    this.logIndent += indentAfter
-    return true
+    if (indentAfter > 0) this.logIndent += indentAfter;
+    return true;
   }
-  error(data, label = '') {
-    return this._write({ channel: 'error', label }, data)
+  error(...data) {
+    return this._write({ channel: 'error' }, ...data);
   }
-  warn(data, label = '') {
-    return this._write({ channel: 'warn', label }, data)
+  warn(...data) {
+    return this._write({ channel: 'warn' }, ...data);
   }
-  info(data, label = '') {
-    return this._write({ channel: 'info', label }, data)
+  info(...data) {
+    return this._write({ channel: 'info' }, ...data);
   }
-  log(data, label = '') {
-    return this._write({ channel: 'log', label }, data)
+  log(...data) {
+    return this._write({ channel: 'log' }, ...data);
   }
-  debug(data, label = '') {
-    return this._write({ channel: 'debug', label }, data)
+  debug(...data) {
+    return this._write({ channel: 'debug' }, ...data);
   }
-  trace(data, label = '') {
-    return this._write({ channel: 'trace', label }, data)
+  trace(...data) {
+    return this._write({ channel: 'trace' }, ...data);
   }
   group(label = '', channel = 'info') {
-    if (LEVELS_MAPPING[validateChannelInput(channel)] <= this.logLevel) this._console.group(label)
+    if (LEVELS_MAPPING[validateChannelInput(channel)] <= this.logLevel) this._console.group(label);
   }
   groupEnd(channel = 'info') {
-    if (LEVELS_MAPPING[validateChannelInput(channel)] <= this.logLevel) this._console.groupEnd()
+    if (LEVELS_MAPPING[validateChannelInput(channel)] <= this.logLevel) this._console.groupEnd();
   }
   enterBlock(label, channel = `info`) {
-    return this._write({ channel, indentAfter: 2 }, `[${label}] Begin...`)
+    return this._write({ channel, label, indentAfter: 2 }, `#-- Start --#`);
   }
   exitBlock(label, channel = `info`) {
-    return this._write({ channel, indentAfter: -2 }, `[${label}] Completed!`)
+    return this._write({ channel, label, indentAfter: -2 }, `--# Complete #--`);
   }
   setLogLevel(level = 'info') {
-    const prevLevel = this.logLevel
-    this.logLevel = validateChannelInput(level)
-    return prevLevel
+    const prevLevel = this.logLevel;
+    this.logLevel = validateChannelInput(level);
+    return prevLevel;
   }
 }
 
@@ -156,8 +179,8 @@ class FileLogger extends Logger {
   constructor(filename, { level, prefix, indent } = {}) {
     const outStream = Array.isArray(filename)
       ? filename.map(x => path.resolve(x)).map(x => createWriteStream(x))
-      : createWriteStream(path.resolve(filename))
-    super({ level, prefix, indent, outStream })
+      : createWriteStream(path.resolve(filename));
+    super({ level, prefix, indent, outStream });
   }
 }
 /**
@@ -165,4 +188,4 @@ class FileLogger extends Logger {
  * Exports.
  * ============================================================================
  */
-module.exports = { Logger, FileLogger }
+module.exports = { Logger, FileLogger };

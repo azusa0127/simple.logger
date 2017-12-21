@@ -1,15 +1,12 @@
 {
   "name": "simple.logger",
-  "version": "0.0.2",
+  "version": "1.0.0",
   "description": "A Simple Logger",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node example.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/azusa0127/simple.logger.git"
-  },
+  "repository": "azusa0127/simple.logger",
   "keywords": [
     "a",
     "simple",
@@ -21,9 +18,5 @@
     "better"
   ],
   "author": "Phoenix Song <github.com/azusa0127>",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/azusa0127/simple.logger/issues"
-  },
-  "homepage": "https://github.com/azusa0127/simple.logger#readme"
+  "license": "MIT"
 }
