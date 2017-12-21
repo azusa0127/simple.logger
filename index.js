@@ -90,7 +90,7 @@ class Logger {
     this.logPrefix = typeof prefix === 'string' ? prefix : '';
     this._console = Array.isArray(outStream)
       ? new console.Console(outStream[0], outStream[1])
-      : new console.Console(outStream, outStream);
+      : new console.Console(outStream);
     this.showTime = showTime;
     this.shortTime = shortTime;
     this.showChannel = showChannel;
@@ -177,7 +177,7 @@ class Logger {
   exitBlock(label, channel = `info`) {
     return this._write({ channel, label, indentAfter: -2 }, `--- Complete ---`);
   }
-  setLogLevel(level = 'info') {
+  changeLogLevel(level = 'info') {
     const prevLevel = this.logLevel;
     this.logLevel = validateChannelInput(level);
     return prevLevel;
@@ -185,11 +185,11 @@ class Logger {
 }
 
 class FileLogger extends Logger {
-  constructor(filename, { level, prefix, indent } = {}) {
+  constructor(filename, opts = {}) {
     const outStream = Array.isArray(filename)
       ? filename.map(x => path.resolve(x)).map(x => createWriteStream(x))
       : createWriteStream(path.resolve(filename));
-    super({ level, prefix, indent, outStream });
+    super({ ...opts, outStream });
   }
 }
 /**

@@ -19,7 +19,7 @@ log.error(`That's it.`);
 log.exitBlock(`Story`);
 
 // Change log level to show every channel.
-log.setLogLevel(`trace`);
+log.changeLogLevel(`trace`);
 log.log(`Now You should see me`);
 log.debug({
   glossary: {
