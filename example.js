@@ -21,7 +21,7 @@ log.exitBlock(`Story`);
 // Change log level to show every channel.
 log.setLogLevel(`trace`);
 log.log(`Now You should see me`);
-const s = {
+log.debug({
   glossary: {
     title: `example glossary`,
     GlossDiv: {
@@ -42,8 +42,7 @@ const s = {
       },
     },
   },
-};
-log.debug(s);
+});
 
 log.error(new Error(`A Minor Error?`));
 log.trace(new Error(`A Big Error!`));

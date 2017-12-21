@@ -62,7 +62,12 @@ const padEOLandIndent = (message, indent = 0) =>
 
 const formatData = (channel = 'info', ...data) =>
   data
-    .map(x => (channel !== 'error' && typeof x !== 'string' ? inspect(x, false, 10, true) : x))
+    .map(
+      x =>
+        typeof x !== 'string' && channel !== 'error' && channel !== 'trace'
+          ? inspect(x, false, 10, true)
+          : x,
+    )
     .join(' ');
 
 /**
@@ -120,7 +125,8 @@ class Logger {
 
     switch (channel) {
       case 'trace':
-        this._console.trace(message);
+        this._console.error(message.substr(0, message.indexOf('|') + 1));
+        this._console.trace(...data);
         break;
       case 'error':
       case 'warn':
@@ -156,17 +162,20 @@ class Logger {
   trace(...data) {
     return this._write({ channel: 'trace' }, ...data);
   }
+  raw(...data) {
+    return this.console.log(...data);
+  }
   group(label = '', channel = 'info') {
     if (LEVELS_MAPPING[validateChannelInput(channel)] <= this.logLevel) this._console.group(label);
   }
   groupEnd(channel = 'info') {
-    if (LEVELS_MAPPING[validateChannelInput(channel)] <= this.logLevel) this._console.groupEnd();
+    if (LEVELS_MAPPING[validateChannelInput(channel)] <= this.logLevel) this._console.grouppEnd();
   }
   enterBlock(label, channel = `info`) {
-    return this._write({ channel, label, indentAfter: 2 }, `#-- Start --#`);
+    return this._write({ channel, label, indentAfter: 2 }, `--- Start ---`);
   }
   exitBlock(label, channel = `info`) {
-    return this._write({ channel, label, indentAfter: -2 }, `--# Complete #--`);
+    return this._write({ channel, label, indentAfter: -2 }, `--- Complete ---`);
   }
   setLogLevel(level = 'info') {
     const prevLevel = this.logLevel;
