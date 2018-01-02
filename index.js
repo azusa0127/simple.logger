@@ -189,7 +189,7 @@ class FileLogger extends Logger {
     const outStream = Array.isArray(filename)
       ? filename.map(x => path.resolve(x)).map(x => createWriteStream(x))
       : createWriteStream(path.resolve(filename));
-    super({ ...opts, outStream });
+    super(Object.assign(opts, { outStream }));
   }
 }
 /**
