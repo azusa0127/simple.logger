@@ -1,8 +1,8 @@
 /**
  * @file Simple.logger
- * @version 1.0.0
+ * @version 2.0.0
  * @author Phoenix Song <github.com/azusa0127>
- * @copyright Phoenix Song (c) 2017
+ * @copyright Phoenix Song (c) 2017-2018
  */
 /**
  * ============================================================================
@@ -11,7 +11,9 @@
  */
 const path = require('path');
 const { createWriteStream } = require('fs');
-const { inspect } = require('util');
+
+const style = require('ansi-styles');
+const { stringify } = require('q-i');
 
 /**
  * ============================================================================
@@ -38,7 +40,16 @@ const LEVELS_SYMBOL = {
   trace: 'TCE',
 };
 
-function validateChannelInput(channel) {
+const LEVELS_STYLE = {
+  error: style.red,
+  warn: style.yellow,
+  info: style.reset,
+  log: style.dim,
+  debug: style.magenta,
+  trace: style.cyan,
+};
+
+function validateChannelInput (channel) {
   switch (channel) {
     case 'error':
     case 'warn':
@@ -60,23 +71,36 @@ const padEOLandIndent = (message, indent = 0) =>
     ? padRight(EOL, indent) + message.split(/\r?\n/).join(padRight(EOL, indent))
     : padLeft(message, indent);
 
-const formatData = (channel = 'info', ...data) =>
-  data
-    .map(
-      x =>
-        typeof x !== 'string' && channel !== 'error' && channel !== 'trace'
-          ? inspect(x, false, 10, true)
-          : x,
-    )
-    .join(' ');
-
 /**
  * ============================================================================
  * Logger.
  * ============================================================================
  */
+
+/**
+ * @typedef {Object} LoggerOptions - Constructor params for Logger.
+ * @prop {string} [level='info'] - Log level <error|warn|info|log|debug|trace>.
+ * @prop {string} [prefix=''] - Prefix on every logging message.
+ * @prop {Object|Array<Object>} [outStream=[process.stdout, process.stderr]] - Output writable streams.
+ * @prop {boolean} [showTime=true] - Toggle date and time display in message prefixes.
+ * @prop {boolean} [shortTime=false] - Toggle date display in message prefixes.
+ * @prop {boolean} [showChannel=ture] - Toggle logging channel display in message prefixes.
+ * @prop {boolean} [colored=true] - Toggle colored style output.
+ */
 class Logger {
-  constructor(opt = {}) {
+  /**
+   * Create a new Logger.
+   * @param {LoggerOptions|string} [opt={}] Constructor params for Logger.
+   * @prop {string} [opt.level='info'] - Log level <error|warn|info|log|debug|trace>.
+   * @prop {string} [opt.prefix=''] - Prefix on every logging message.
+   * @prop {Object|Array<Object>} [opt.outStream=[process.stdout, process.stderr]] - Output writable streams.
+   * @prop {boolean} [opt.showTime=true] - Toggle date and time display in message prefixes.
+   * @prop {boolean} [opt.shortTime=false] - Toggle date display in message prefixes.
+   * @prop {boolean} [opt.showChannel=ture] - Toggle logging channel display in message prefixes.
+   * @prop {boolean} [opt.colored=true] - Toggle colored style output.
+   * @return {Logger}
+   */
+  constructor (opt = {}) {
     let {
       level = 'info',
       prefix = '',
@@ -84,6 +108,7 @@ class Logger {
       showTime = true,
       shortTime = false,
       showChannel = true,
+      colored = true,
     } = opt;
     if (typeof opt === 'string') prefix = opt;
     this.logLevel = LEVELS_MAPPING[validateChannelInput(level)];
@@ -95,8 +120,25 @@ class Logger {
     this.shortTime = shortTime;
     this.showChannel = showChannel;
     this.logIndent = 0;
+    this.colored = colored;
   }
-  _write(
+
+  _formatData (channel = 'info', label = null, ...data) {
+    return padEOLandIndent(
+      ((label && `<${label}> `) || '') +
+        data
+          .map(
+            x =>
+              typeof x !== 'string' && channel !== 'error' && channel !== 'trace'
+                ? `${this.colored ? stringify(x) : JSON.stringify(x, null, 2)}\n`
+                : x
+          )
+          .join(' '),
+      this.logIndent
+    );
+  }
+
+  _write (
     {
       channel = 'info',
       label = '',
@@ -112,16 +154,17 @@ class Logger {
     // Change Indentation
     if (indentAfter < 0) this.logIndent += indentAfter;
 
-    const message = `${[
+    const channelStyle = LEVELS_STYLE[channel];
+    const prefixes = `${[
       showChannel ? LEVELS_SYMBOL[channel] : '',
       showTime ? (shortTime ? new Date().toLocaleTimeString() : new Date().toLocaleString()) : '',
       this.logPrefix,
     ]
       .filter(x => x)
-      .join(' ')}| ${padEOLandIndent(
-      (label ? `<${label}> ` : label) + formatData(channel, ...data),
-      this.logIndent,
-    )}`;
+      .join(' ')}|`;
+
+    const message = `${(this.colored && `${channelStyle.open}${prefixes}${channelStyle.close}`) ||
+      prefixes} ${this._formatData(channel, label, ...data)}`;
 
     switch (channel) {
       case 'trace':
@@ -144,52 +187,72 @@ class Logger {
     if (indentAfter > 0) this.logIndent += indentAfter;
     return true;
   }
-  error(...data) {
+  error (...data) {
     return this._write({ channel: 'error' }, ...data);
   }
-  warn(...data) {
+  warn (...data) {
     return this._write({ channel: 'warn' }, ...data);
   }
-  info(...data) {
+  info (...data) {
     return this._write({ channel: 'info' }, ...data);
   }
-  log(...data) {
+  log (...data) {
     return this._write({ channel: 'log' }, ...data);
   }
-  debug(...data) {
+  debug (...data) {
     return this._write({ channel: 'debug' }, ...data);
   }
-  trace(...data) {
+  trace (...data) {
     return this._write({ channel: 'trace' }, ...data);
   }
-  raw(...data) {
+  raw (...data) {
     return this.console.log(...data);
   }
-  group(label = '', channel = 'info') {
+  group (label = '', channel = 'info') {
     if (LEVELS_MAPPING[validateChannelInput(channel)] <= this.logLevel) this._console.group(label);
   }
-  groupEnd(channel = 'info') {
+  groupEnd (channel = 'info') {
     if (LEVELS_MAPPING[validateChannelInput(channel)] <= this.logLevel) this._console.grouppEnd();
   }
-  enterBlock(label, channel = `info`) {
+  enterBlock (label, channel = `info`) {
     return this._write({ channel, label, indentAfter: 2 }, `--- Start ---`);
   }
-  exitBlock(label, channel = `info`) {
+  exitBlock (label, channel = `info`) {
     return this._write({ channel, label, indentAfter: -2 }, `--- Complete ---`);
   }
-  changeLogLevel(level = 'info') {
+  changeLogLevel (level = 'info') {
     const prevLevel = this.logLevel;
     this.logLevel = validateChannelInput(level);
     return prevLevel;
   }
 }
 
+/**
+ * @typedef {Object} FileLoggerOptions - Constructor params for FileLogger.
+ * @prop {string} [level='info'] - Log level <error|warn|info|log|debug|trace>.
+ * @prop {string} [prefix=''] - Prefix on every logging message.
+ * @prop {boolean} [showTime=true] - Toggle date and time display in message prefixes.
+ * @prop {boolean} [shortTime=false] - Toggle date display in message prefixes.
+ * @prop {boolean} [showChannel=ture] - Toggle logging channel display in message prefixes.
+ */
+
 class FileLogger extends Logger {
-  constructor(filename, opts = {}) {
+  /**
+   * Create a new FileLogger.
+   * @param {string|Array<string>} filename - Log file paths [stdout|stderr].
+   * @param {FileLoggerOptions|string} [opt={}] Constructor params for Logger.
+   * @prop {string} [opt.level='info'] - Log level <error|warn|info|log|debug|trace>.
+   * @prop {string} [opt.prefix=''] - Prefix on every logging message.
+   * @prop {boolean} [opt.showTime=true] - Toggle date and time display in message prefixes.
+   * @prop {boolean} [opt.shortTime=false] - Toggle date display in message prefixes.
+   * @prop {boolean} [opt.showChannel=ture] - Toggle logging channel display in message prefixes.
+   * @return {Logger}
+   */
+  constructor (filename, opts = {}) {
     const outStream = Array.isArray(filename)
       ? filename.map(x => path.resolve(x)).map(x => createWriteStream(x))
       : createWriteStream(path.resolve(filename));
-    super(Object.assign(opts, { outStream }));
+    super(Object.assign(opts, { colored: false, outStream }));
   }
 }
 /**

@@ -29,15 +29,14 @@ log.debug({
       GlossList: {
         GlossEntry: {
           ID: `SGML`,
-          SortAs: `SGML`,
+          Sorted: true,
           GlossTerm: `Standard Generalized Markup Language`,
-          Acronym: `SGML`,
+          Index: 8879,
           Abbrev: `ISO 8879:1986`,
           GlossDef: {
             para: `A meta-markup language, used to create markup languages such as DocBook.`,
             GlossSeeAlso: [`GML`, `XML`],
           },
-          GlossSee: `markup`,
         },
       },
     },
