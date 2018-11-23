@@ -79,25 +79,18 @@ const padEOLandIndent = (message, indent = 0) =>
 
 /**
  * @typedef {Object} LoggerOptions - Constructor params for Logger.
- * @prop {string} [level='info'] - Log level <error|warn|info|log|debug|trace>.
- * @prop {string} [prefix=''] - Prefix on every logging message.
- * @prop {Object|Array<Object>} [outStream=[process.stdout, process.stderr]] - Output writable streams.
- * @prop {boolean} [showTime=true] - Toggle date and time display in message prefixes.
- * @prop {boolean} [shortTime=false] - Toggle date display in message prefixes.
- * @prop {boolean} [showChannel=ture] - Toggle logging channel display in message prefixes.
- * @prop {boolean} [colored=true] - Toggle colored style output.
+ * @property {string} [level='info'] - Log level <error|warn|info|log|debug|trace>.
+ * @property {string} [prefix=''] - Prefix on every logging message.
+ * @property {Object|Array<Object>} [outStream=[process.stdout, process.stderr]] - Output writable streams.
+ * @property {boolean} [showTime=true] - Toggle date and time display in message prefixes.
+ * @property {boolean} [shortTime=false] - Toggle date display in message prefixes.
+ * @property {boolean} [showChannel=ture] - Toggle logging channel display in message prefixes.
+ * @property {boolean} [colored=true] - Toggle colored style output.
  */
 class Logger {
   /**
    * Create a new Logger.
    * @param {LoggerOptions|string} [opt={}] Constructor params for Logger.
-   * @prop {string} [opt.level='info'] - Log level <error|warn|info|log|debug|trace>.
-   * @prop {string} [opt.prefix=''] - Prefix on every logging message.
-   * @prop {Object|Array<Object>} [opt.outStream=[process.stdout, process.stderr]] - Output writable streams.
-   * @prop {boolean} [opt.showTime=true] - Toggle date and time display in message prefixes.
-   * @prop {boolean} [opt.shortTime=false] - Toggle date display in message prefixes.
-   * @prop {boolean} [opt.showChannel=ture] - Toggle logging channel display in message prefixes.
-   * @prop {boolean} [opt.colored=true] - Toggle colored style output.
    * @return {Logger}
    */
   constructor (opt = {}) {
@@ -206,7 +199,7 @@ class Logger {
     return this._write({ channel: 'trace' }, ...data);
   }
   raw (...data) {
-    return this.console.log(...data);
+    return this._console.log(...data);
   }
   group (label = '', channel = 'info') {
     if (LEVELS_MAPPING[validateChannelInput(channel)] <= this.logLevel) this._console.group(label);
@@ -229,11 +222,11 @@ class Logger {
 
 /**
  * @typedef {Object} FileLoggerOptions - Constructor params for FileLogger.
- * @prop {string} [level='info'] - Log level <error|warn|info|log|debug|trace>.
- * @prop {string} [prefix=''] - Prefix on every logging message.
- * @prop {boolean} [showTime=true] - Toggle date and time display in message prefixes.
- * @prop {boolean} [shortTime=false] - Toggle date display in message prefixes.
- * @prop {boolean} [showChannel=ture] - Toggle logging channel display in message prefixes.
+ * @property {string} [level='info'] - Log level <error|warn|info|log|debug|trace>.
+ * @property {string} [prefix=''] - Prefix on every logging message.
+ * @property {boolean} [showTime=true] - Toggle date and time display in message prefixes.
+ * @property {boolean} [shortTime=false] - Toggle date display in message prefixes.
+ * @property {boolean} [showChannel=ture] - Toggle logging channel display in message prefixes.
  */
 
 class FileLogger extends Logger {
@@ -241,11 +234,6 @@ class FileLogger extends Logger {
    * Create a new FileLogger.
    * @param {string|Array<string>} filename - Log file paths [stdout|stderr].
    * @param {FileLoggerOptions|string} [opt={}] Constructor params for Logger.
-   * @prop {string} [opt.level='info'] - Log level <error|warn|info|log|debug|trace>.
-   * @prop {string} [opt.prefix=''] - Prefix on every logging message.
-   * @prop {boolean} [opt.showTime=true] - Toggle date and time display in message prefixes.
-   * @prop {boolean} [opt.shortTime=false] - Toggle date display in message prefixes.
-   * @prop {boolean} [opt.showChannel=ture] - Toggle logging channel display in message prefixes.
    * @return {Logger}
    */
   constructor (filename, opts = {}) {
